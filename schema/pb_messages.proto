@@ -1,0 +1,71 @@
+syntax = "proto2";
+
+message NodeId {
+  optional string name = 1;
+  optional string addr = 2;
+}
+
+message Pids {
+  repeated Pid pids = 1;
+}
+
+message Pid {
+  optional string name = 1;
+  optional string group = 2;
+  optional NodeId node = 3;
+}
+
+message CorrelationId {
+  optional Pid pid = 1;
+  optional uint64 handle = 2;
+  optional uint64 request = 3;
+}
+
+message Envelope {
+  optional Pid to = 1;
+  optional Pid from = 2;
+  optional PbMsg msg = 3;
+  optional CorrelationId cid = 4;
+}
+
+message PbMsg {
+  oneof request {
+	bool get_metrics = 1;
+	uint64 start_timer = 2;
+	bool cancel_timer = 3;
+	bool shutdown = 4;
+	NodeId get_processes = 5;
+	NodeId get_services = 6;
+  }
+  oneof reply {
+    Metrics metrics = 5000;
+    bool timeout = 5001;
+    Pids processes = 5002;
+    Pids services = 5003;
+    Members members = 5004;
+  }
+
+  // The user defined message type
+  extensions 10000;
+}
+
+message Members {
+  repeated Member members = 1;
+}
+
+message Member {
+  optional NodeId node = 1;
+  optional bool connected = 2;
+}
+
+message Metrics {
+  repeated Metric metrics = 1;
+}
+
+message Metric {
+  oneof metric {
+    int64 gauge = 1;
+    uint64 counter = 2;
+    bytes v2_serialized_histogram = 3;
+  }
+}

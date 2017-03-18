@@ -1,7 +1,8 @@
 use std::fmt::{Display, Error, Formatter};
 use std::str::FromStr;
+use pb_messages;
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq, Ord, PartialOrd, RustcEncodable, RustcDecodable)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, Ord, PartialOrd)]
 pub struct NodeId {
     pub name: String,
     pub addr: String
@@ -26,5 +27,14 @@ impl FromStr for NodeId {
             name: v[0].to_string(),
             addr: v[1].to_string()
         })
+    }
+}
+
+impl From<pb_messages::NodeId> for NodeId {
+    fn from(pb_node_id: pb_messages::NodeId) -> NodeId {
+        NodeId {
+            name: pb_node_id.take_name(),
+            addr: pb_node_id.take_addr()
+        }
     }
 }

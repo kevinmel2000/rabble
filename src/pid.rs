@@ -1,12 +1,13 @@
 use std::fmt::{Display, Error, Formatter};
 use std::str::FromStr;
 use node_id::NodeId;
+use pb_messages;
 
 /// A globally unique process id
 ///
 /// Pids can be grouped together for various reasons. This grouping acts like a namespace. If
 /// a Process is not a member of a group, the `group` member of the Pid will be `None`.
-#[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, RustcEncodable, RustcDecodable)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Pid {
     pub group: Option<String>,
     pub name: String,
@@ -42,6 +43,21 @@ impl FromStr for Pid {
                 "Invalid Pid format - Must be of form 'name::node' or \
                 'group::name::node'".to_string()
             )
+        }
+    }
+}
+                
+impl From<pb_messages::Pid> for Pid {
+    fn from(pb_pid: pb_messages::Pid) -> Pid {
+        let group = if pb_pid.has_group() {
+            Some(pb_pid.take_group())
+        } else {
+            None
+        };
+        Pid {
+            name: pb_pid.take_name(),
+            group: group,
+            node: pb_pid.take_node().into()
         }
     }
 }

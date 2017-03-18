@@ -1,9 +1,6 @@
 use std::sync::mpsc::Sender;
 use std::fmt::Debug;
-use rustc_serialize::{Encodable, Decodable};
 use node_id::NodeId;
-use executor::ExecutorMsg;
-use cluster::ClusterMsg;
 use pid::Pid;
 use correlation_id::CorrelationId;
 use process::Process;
@@ -11,6 +8,7 @@ use envelope::Envelope;
 use amy;
 use errors::*;
 use slog;
+use actor_msg::ActorMsg;
 
 macro_rules! send {
     ($s:ident.$t:ident, $msg:expr, $pid:expr, $errmsg:expr) => {
@@ -27,14 +25,14 @@ macro_rules! send {
 /// The Node api is used by services and their handlers to send messages, get status, join
 /// nodes into a cluster, etc...
 #[derive(Clone)]
-pub struct Node<T: Encodable + Decodable + Debug + Clone> {
+pub struct Node<T: ActorMsg> {
     pub id: NodeId,
     pub logger: slog::Logger,
     executor_tx: Sender<ExecutorMsg<T>>,
     cluster_tx: Sender<ClusterMsg<T>>
 }
 
-impl<T: Encodable + Decodable + Debug + Clone> Node<T> {
+impl<T: ActorMsg> Node<T> {
     /// Create a new node. This function should not be called by the user directly. It is called by
     /// by the user call to `rabble::rouse(..)` that initializes a rabble system for a single node.
     pub fn new(id: NodeId,

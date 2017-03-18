@@ -18,6 +18,9 @@ extern crate ferris;
 extern crate slog;
 extern crate slog_stdlog;
 
+#[path = "../schema/pb_messages.rs"]
+mod pb_messages;
+
 #[macro_use]
 mod metrics;
 
@@ -48,13 +51,11 @@ pub use msg::Msg;
 pub use metrics::Metric;
 
 pub use cluster::{
-    ClusterServer,
-    ClusterStatus,
+    ClusterServer
 };
 
 pub use executor::{
     Executor,
-    ExecutorStatus,
     ExecutorMetrics
 };
 
