@@ -1,4 +1,3 @@
-use rustc_serialize::{Encodable, Decodable};
 use std::fmt::Debug;
 use std::sync::mpsc::{Sender, Receiver};
 use std::collections::HashMap;
@@ -14,22 +13,23 @@ use msg::Msg;
 use cluster::ClusterMsg;
 use correlation_id::CorrelationId;
 use metrics::Metrics;
+use user_msg::UserMsg;
 use super::{ExecutorStatus, ExecutorMetrics, ExecutorMsg};
 
-pub struct Executor<T: Encodable + Decodable + Send + Debug + Clone> {
+pub struct Executor<T: UserMsg> {
     pid: Pid,
     node: NodeId,
-    processes: HashMap<Pid, Box<Process<Msg=T>>>,
+    processes: HashMap<Pid, Box<Process<T>>>,
     service_senders: HashMap<Pid, amy::Sender<Envelope<T>>>,
     tx: Sender<ExecutorMsg<T>>,
     rx: Receiver<ExecutorMsg<T>>,
     cluster_tx: Sender<ClusterMsg<T>>,
-    timer_wheel: CopyWheel<(Pid, Option<CorrelationId>)>,
+    timer_wheel: CopyWheel<(Pid, CorrelationId)>,
     logger: slog::Logger,
     metrics: ExecutorMetrics
 }
 
-impl<T: Encodable + Decodable + Send + Debug + Clone> Executor<T> {
+impl<T: UserMsg> Executor<T> {
     pub fn new(node: NodeId,
                tx: Sender<ExecutorMsg<T>>,
                rx: Receiver<ExecutorMsg<T>>,
@@ -69,27 +69,12 @@ impl<T: Encodable + Decodable + Send + Debug + Clone> Executor<T> {
                 ExecutorMsg::RegisterService(pid, tx) => {
                     self.service_senders.insert(pid, tx);
                 },
-                ExecutorMsg::GetStatus(correlation_id) => self.get_status(correlation_id),
                 ExecutorMsg::Tick => self.tick(),
 
                 // Just return so the thread exits
                 ExecutorMsg::Shutdown => return
             }
         }
-    }
-
-    fn get_status(&self, correlation_id: CorrelationId) {
-        let status = ExecutorStatus {
-            total_processes: self.processes.len(),
-            services: self.service_senders.keys().cloned().collect()
-        };
-        let envelope = Envelope {
-            to: correlation_id.pid.clone(),
-            from: self.pid.clone(),
-            msg: Msg::ExecutorStatus(status),
-            correlation_id: Some(correlation_id)
-        };
-        self.route_to_service(envelope);
     }
 
     fn start(&mut self, pid: Pid, mut process: Box<Process<Msg=T>>) {

@@ -24,8 +24,8 @@ message CorrelationId {
 message Envelope {
   optional Pid to = 1;
   optional Pid from = 2;
-  optional PbMsg msg = 3;
-  optional CorrelationId cid = 4;
+  optional CorrelationId cid = 3;
+  optional PbMsg msg = 4;
 }
 
 message PbMsg {
@@ -38,15 +38,15 @@ message PbMsg {
 	NodeId get_services = 6;
   }
   oneof reply {
-    Metrics metrics = 5000;
-    bool timeout = 5001;
-    Pids processes = 5002;
-    Pids services = 5003;
-    Members members = 5004;
+    Metrics metrics = 50000;
+    bool timeout = 50001;
+    Pids processes = 50002;
+    Pids services = 50003;
+    Members members = 50004;
   }
 
-  // The user defined message type
-  extensions 10000;
+  // rust protobuf doesn't support extensions yet, so we hack around it via bytes.
+  optional bytes user_msg = 100000;
 }
 
 message Members {
@@ -68,4 +68,21 @@ message Metric {
     uint64 counter = 2;
     bytes v2_serialized_histogram = 3;
   }
+}
+
+// This message is used only by the cluster server. It will never get sent to processes
+message ClusterServerMsg {
+  oneof msg {
+    MemberORSet orset = 1;
+    bool Ping = 2;
+    Envelope envelope = 3;
+    // The actual delta is serialized in msgpack using rustc_serialize for now.
+    bytes Delta = 4;
+  }
+}
+
+message MemberORSet {
+  optional NodeId from = 1;
+  // The actual ORSet is serialized in msgpack using rustc_serialize for now.
+  optional bytes orset = 2;
 }

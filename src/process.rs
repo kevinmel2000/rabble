@@ -1,11 +1,11 @@
 use pid::Pid;
 use envelope::Envelope;
-use actor_msg::ActorMsg;
+use user_msg::UserMsg;
 
-pub trait Process<T: ActorMsg> : Send {
+pub trait Process<T: UserMsg> : Send {
 
     /// Initialize process state if necessary
-    fn init(&mut self, _executor_pid: Pid) -> Vec<Envelope<Self::Msg>> {
+    fn init(&mut self, _executor_pid: Pid) -> Vec<Envelope<T>> {
         Vec::new()
     }
 

@@ -1,5 +1,6 @@
 use std::fmt::{Display, Error, Formatter};
 use std::str::FromStr;
+use std::convert::From;
 use pb_messages;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Ord, PartialOrd)]
@@ -36,5 +37,14 @@ impl From<pb_messages::NodeId> for NodeId {
             name: pb_node_id.take_name(),
             addr: pb_node_id.take_addr()
         }
+    }
+}
+
+impl From<NodeId> for pb_messages::NodeId {
+    fn from(node_id: NodeId) -> pb_messages::NodeId {
+        let mut pb_node_id = pb_messages::NodeId::new();
+        pb_node_id.set_name(node_id.name);
+        pb_node_id.set_addr(node_id.addr);
+        pb_node_id
     }
 }

@@ -1,14 +1,16 @@
 use std::fmt::Debug;
 use correlation_id::CorrelationId;
 use metrics::Metric;
-use pb_messages::PbMsg;
+use pb_messages::{self, PbMsg};
+use user_msg::UserMsg;
 
 type Name = &'static str;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Msg {
+pub enum Msg<T: UserMsg> {
     Req(Req),
     Rpy(Rpy),
+    User(T),
     Unknown
 }
 
@@ -31,9 +33,14 @@ pub enum Rpy {
     Members(Vec<(NodeId, Connected)>)
 }
     
-impl From<PbMsg> for Msg {
-    fn from(pb_msg: PbMsg) -> Self {
+impl<T: UserMsg> From<PbMsg> for Msg<T> {
+    fn from(pb_msg: PbMsg) -> Msg<T> {
 
+        /* The user level message type */
+        if pb_msg.has_user_msg() {
+            let encoded = pb_msg.take_user_msg();
+            return Msg::User(T::from_bytes(encoded));
+        }
 
         /* Requests */
         if pb_msg.has_start_timer() {
@@ -89,7 +96,6 @@ impl From<PbMsg> for Msg {
         if pb_msg.has_members() {
             let members = pb_msg.take_members()
                 .take_members()
-                .take_members()
                 .into_iter()
                 .map(|m| (m.take_node().into(), m.get_connected())).collect();
             return Msg::Rpy(Rpy::Members(members));
@@ -97,5 +103,73 @@ impl From<PbMsg> for Msg {
 
         Msg::Unknown
 
+    }
+}
+
+impl<T: UserMsg> From<Msg<T>> for PbMsg {
+    fn from(msg: Msg<T>) -> PbMsg {
+        let mut pbmsg = PbMsg::new();
+        match msg {
+            Msg::User(user_msg) => {
+                let bytes = user_msg.to_bytes();
+                pbmsg.set_user_msg(bytes);
+            },
+            Msg::Req(Req::GetMetrics) => {
+                pbmsg.set_get_metrics(true);
+            },
+            Msg::Req(Req::StartTimer(time_in_ms)) => {
+                pbmsg.set_start_timer(time_in_ms);
+            },
+            Msg::Req(Req::CancelTimer) => {
+                pbmsg.set_cancel_timer(true);
+            },
+            Msg::Req(Req::Shutdown) => {
+                pbmsg.set_shutdown(true);
+            },
+            Msg::Req(Req::GetProcesses) => {
+                pbmsg.set_get_processes(true);
+            },
+            Msg::Req(Req::GetServices) => {
+                pbmsg.set_get_services(true);
+            },
+            Msg::Rpy(Rpy::Timeout) => {
+                pbmsg.set_timeout(true);
+            },
+            Msg::Rpy(Rpy::Metrics(metrics)) => {
+                let mut pb_metrics = pb_messages::Metrics::new();
+                pb_metrics.set_metrics(metrics.map(|m| {
+                    let mut metric = pb_messages::Metric::new();
+                    match m {
+                        Gauge(val) => metric.set_gauge(val),
+                        Counter(val) => metric.set_counter(val)
+                        // TODO: Add histogram support
+                    }
+                    metric
+                }).collect());
+                pb_msg.set_metrics(pb_metrics);
+            },
+            Msg::Rpy(Rpy::Processes(pids)) => {
+                let mut processes = pb_messages::Pids::new();
+                processes.set_pids(pids.map(|p| p.into()).collect());
+                pb_msg.set_processes(processes);
+            },
+            Msg::Rpy(Rpy::Services(pids)) => {
+                let mut services = pb_messages::Pids::new();
+                services.set_pids(pids.map(|p| p.into()).collect());
+                pb_msg.set_services(services);
+            },
+            Msg::Rpy(Rpy::Members(members)) => {
+                let mut pb_members = pb_messages::Members::new();
+                pb_members.set_members(members.map|(node_id, connected)| {
+                    let mut member = pb_messages::Member::new();
+                    member.set_node(node_id.into());
+                    member.set_connected(connected);
+                    member
+                }).collect();
+                pb_msg.set_members(pb_members);
+            },
+            Msg::Unknown => unreachable
+        }
+        pb_msg
     }
 }

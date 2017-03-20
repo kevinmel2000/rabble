@@ -1,5 +1,6 @@
 use std::fmt::{Display, Error, Formatter};
 use std::str::FromStr;
+use std::convert::From;
 use node_id::NodeId;
 use pb_messages;
 
@@ -59,5 +60,17 @@ impl From<pb_messages::Pid> for Pid {
             group: group,
             node: pb_pid.take_node().into()
         }
+    }
+}
+
+impl From<Pid> for pb_messages::Pid {
+    fn from(pid: Pid) -> pb_messages::Pid {
+        let mut pb_pid = pb_messages::Pid::new();
+        pb_pid.set_name(pid.name);
+        if let Some(group) = pid.group {
+            pb_pid.set_group(group);
+        }
+        pb_pid.set_node(pid.node.into());
+        pb_pid
     }
 }

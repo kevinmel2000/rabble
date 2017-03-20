@@ -19,7 +19,7 @@ use pid::Pid;
 use correlation_id::CorrelationId;
 use errors::*;
 use metrics::Metrics;
-use super::{ClusterStatus, ClusterMsg, ExternalMsg, ClusterMetrics};
+use super::{ClusterMsg, ExternalMsg, ClusterMetrics};
 
 // TODO: This is totally arbitrary right now and should probably be user configurable
 const MAX_FRAME_SIZE: u32 = 100*1024*1024; // 100 MB
@@ -55,7 +55,7 @@ impl Conn {
 
 /// A struct that handles cluster membership connection and routing of messages to processes on
 /// other nodes.
-pub struct ClusterServer<T: Encodable + Decodable + Debug + Clone> {
+pub struct ClusterServer<T: UserMsg> {
     pid: Pid,
     node: NodeId,
     rx: Receiver<ClusterMsg<T>>,
@@ -73,7 +73,7 @@ pub struct ClusterServer<T: Encodable + Decodable + Debug + Clone> {
     metrics: ClusterMetrics
 }
 
-impl<T: Encodable + Decodable + Debug + Clone> ClusterServer<T> {
+impl<T: UserMsg> ClusterServer<T> {
     pub fn new(node: NodeId,
                rx: Receiver<ClusterMsg<T>>,
                executor_tx: Sender<ExecutorMsg<T>>,
@@ -159,34 +159,8 @@ impl<T: Encodable + Decodable + Debug + Clone> ClusterServer<T> {
                 }
                 self.send_remote(envelope)
             },
-            ClusterMsg::GetStatus(correlation_id) => {
-                self.metrics.status_requests += 1;
-                self.get_status(correlation_id)
-            },
             ClusterMsg::Shutdown => Err(ErrorKind::Shutdown(self.pid.clone()).into())
         }
-    }
-
-    fn get_status(&self, correlation_id: CorrelationId) -> Result<()> {
-        let status = ClusterStatus {
-            members: self.members.all(),
-            established: self.established.keys().cloned().collect(),
-            num_connections: self.connections.len()
-        };
-        let envelope = Envelope {
-            to: correlation_id.pid.clone(),
-            from: self.pid.clone(),
-            msg: Msg::ClusterStatus(status),
-            correlation_id: Some(correlation_id)
-        };
-        // Route the response through the executor since it knows how to contact all Pids
-        if let Err(mpsc::SendError(ExecutorMsg::Envelope(envelope))) =
-            self.executor_tx.send(ExecutorMsg::Envelope(envelope))
-        {
-            return Err(ErrorKind::SendError("ExecutorMsg::Envelope".to_string(),
-                                            Some(envelope.to)).into());
-        }
-        Ok(())
     }
 
     fn send_remote(&mut self, envelope: Envelope<T>) -> Result<()> {
